@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Visual Data Cleaning Tool - 데이터 클리닝 도구</title>
+  <meta name="description" content="CSV 데이터를 업로드하고 결측치와 이상치를 시각적으로 감지하여 클리닝하는 도구">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <h1>📊 Visual Data Cleaning Tool</h1>
+      <p>CSV 데이터를 업로드하고 결측치와 이상치를 자동으로 감지하여 클리닝하세요</p>
+    </header>
+
+    <!-- Upload Section -->
+    <section class="upload-section">
+      <div class="glass-card upload-zone" id="uploadZone">
+        <div class="upload-icon">📁</div>
+        <h3>CSV 또는 XLSX 파일을 드래그하거나 클릭하여 업로드</h3>
+        <p>지원 형식: .csv, .xlsx</p>
+        <input type="file" id="fileInput" accept=".csv,.xlsx">
+      </div>
+    </section>
+
+    <!-- Dashboard -->
+    <div class="dashboard" id="dashboard">
+      <!-- Quality Score -->
+      <section class="quality-score">
+        <div class="score-display">
+          <div class="score-number" id="qualityScore">0</div>
+          <div class="score-label">데이터 품질 점수</div>
+        </div>
+      </section>
+
+      <!-- Metrics Grid -->
+      <section class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-header">
+            <span class="metric-label">총 행 수</span>
+            <span class="metric-icon">📋</span>
+          </div>
+          <div class="metric-value" id="totalRows">0</div>
+          <div class="metric-subtext">데이터 행</div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width: 100%"></div>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-header">
+            <span class="metric-label">총 열 수</span>
+            <span class="metric-icon">📊</span>
+          </div>
+          <div class="metric-value" id="totalColumns">0</div>
+          <div class="metric-subtext">데이터 열</div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width: 100%"></div>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-header">
+            <span class="metric-label">결측치</span>
+            <span class="metric-icon">❌</span>
+          </div>
+          <div class="metric-value" id="missingCount">0</div>
+          <div class="metric-subtext" id="missingPercent">0% of total cells</div>
+          <div class="progress-bar">
+            <div class="progress-fill" id="missingProgress" style="width: 0%; background: var(--color-error)"></div>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-header">
+            <span class="metric-label">이상치</span>
+            <span class="metric-icon">⚠️</span>
+          </div>
+          <div class="metric-value" id="outlierCount">0</div>
+          <div class="metric-subtext" id="outlierPercent">0% of numeric cells</div>
+          <div class="progress-bar">
+            <div class="progress-fill" id="outlierProgress" style="width: 0%; background: var(--color-warning)"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Control Panel -->
+      <section class="control-panel glass-card">
+        <h2>🛠️ 데이터 클리닝 옵션</h2>
+        <div class="controls-grid">
+          <!-- Missing Values Control -->
+          <div class="control-group">
+            <h4>🔴 결측치 처리</h4>
+            <label for="missingMethod">처리 방법 선택:</label>
+            <select id="missingMethod">
+              <option value="">선택하세요</option>
+              <option value="mean">평균값으로 채우기</option>
+              <option value="median">중앙값으로 채우기</option>
+              <option value="mode">최빈값으로 채우기</option>
+              <option value="delete">행 삭제</option>
+            </select>
+            <button class="btn btn-primary" id="applyMissingBtn" disabled>적용</button>
+          </div>
+
+          <!-- Outliers Control -->
+          <div class="control-group">
+            <h4>🟠 이상치 처리</h4>
+            <label for="outlierMethod">처리 방법 선택:</label>
+            <select id="outlierMethod">
+              <option value="">선택하세요</option>
+              <option value="cap">경계값으로 제한</option>
+              <option value="delete">행 삭제</option>
+            </select>
+            <button class="btn btn-primary" id="applyOutlierBtn" disabled>적용</button>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div style="display: flex; gap: 1rem; margin-top: 1.5rem; flex-wrap: wrap;">
+          <button class="btn btn-secondary" id="resetBtn">🔄 원본으로 되돌리기</button>
+          <button class="btn btn-success" id="exportBtn">💾 클리닝된 데이터 다운로드</button>
+          <button class="btn btn-secondary" id="toggleComparisonBtn">👁️ Before/After 비교</button>
+        </div>
+      </section>
+
+      <!-- Legend -->
+      <div class="legend">
+        <div class="legend-item">
+          <div class="legend-color missing"></div>
+          <span>결측치</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color outlier"></div>
+          <span>이상치</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color changed"></div>
+          <span>변경된 값</span>
+        </div>
+      </div>
+
+      <!-- Current Data Table -->
+      <section class="table-section glass-card">
+        <h3>📈 현재 데이터</h3>
+        <div class="table-container">
+          <table class="data-table" id="currentTable">
+            <thead id="currentTableHead"></thead>
+            <tbody id="currentTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Comparison Section -->
+      <section class="comparison-section" id="comparisonSection">
+        <div class="comparison-grid">
+          <!-- Before -->
+          <div class="glass-card comparison-panel">
+            <h3>📊 Before (원본)</h3>
+            <div class="table-container">
+              <table class="data-table" id="beforeTable">
+                <thead id="beforeTableHead"></thead>
+                <tbody id="beforeTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- After -->
+          <div class="glass-card comparison-panel">
+            <h3>✨ After (클리닝 후)</h3>
+            <div class="table-container">
+              <table class="data-table" id="afterTable">
+                <thead id="afterTableHead"></thead>
+                <tbody id="afterTableBody"></tbody>
+              </table>
+            </div>
+            <!DOCTYPE html>
+            <html lang="ko">
+
+            <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Visual Data Cleaning Tool - 데이터 클리닝 도구</title>
+              <meta name="description" content="CSV 데이터를 업로드하고 결측치와 이상치를 시각적으로 감지하여 클리닝하는 도구">
+
+              <!-- Google Fonts -->
+              <link rel="preconnect" href="https://fonts.googleapis.com">
+              <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+              <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap"
+                rel="stylesheet">
+
+              <!-- Stylesheet -->
+              <link rel="stylesheet" href="styles.css">
+            </head>
+
+            <body>
+              <div class="container">
+                <!-- Header -->
+                <header class="header">
+                  <h1>📊 Visual Data Cleaning Tool</h1>
+                  <p>CSV 데이터를 업로드하고 결측치와 이상치를 자동으로 감지하여 클리닝하세요</p>
+                </header>
+
+                <!-- Upload Section -->
+                <section class="upload-section">
+                  <div class="glass-card upload-zone" id="uploadZone">
+                    <div class="upload-icon">📁</div>
+                    <h3>CSV 또는 XLSX 파일을 드래그하거나 클릭하여 업로드</h3>
+                    <p>지원 형식: .csv, .xlsx</p>
+                    <input type="file" id="fileInput" accept=".csv,.xlsx">
+                  </div>
+                </section>
+
+                <!-- Dashboard -->
+                <div class="dashboard" id="dashboard">
+                  <!-- Quality Score -->
+                  <section class="quality-score">
+                    <div class="score-display">
+                      <div class="score-number" id="qualityScore">0</div>
+                      <div class="score-label">데이터 품질 점수</div>
+                    </div>
+                  </section>
+
+                  <!-- Metrics Grid -->
+                  <section class="metrics-grid">
+                    <div class="metric-card">
+                      <div class="metric-header">
+                        <span class="metric-label">총 행 수</span>
+                        <span class="metric-icon">📋</span>
+                      </div>
+                      <div class="metric-value" id="totalRows">0</div>
+                      <div class="metric-subtext">데이터 행</div>
+                      <div class="progress-bar">
+                        <div class="progress-fill" style="width: 100%"></div>
+                      </div>
+                    </div>
+
+                    <div class="metric-card">
+                      <div class="metric-header">
+                        <span class="metric-label">총 열 수</span>
+                        <span class="metric-icon">📊</span>
+                      </div>
+                      <div class="metric-value" id="totalColumns">0</div>
+                      <div class="metric-subtext">데이터 열</div>
+                      <div class="progress-bar">
+                        <div class="progress-fill" style="width: 100%"></div>
+                      </div>
+                    </div>
+
+                    <div class="metric-card">
+                      <div class="metric-header">
+                        <span class="metric-label">결측치</span>
+                        <span class="metric-icon">❌</span>
+                      </div>
+                      <div class="metric-value" id="missingCount">0</div>
+                      <div class="metric-subtext" id="missingPercent">0% of total cells</div>
+                      <div class="progress-bar">
+                        <div class="progress-fill" id="missingProgress"
+                          style="width: 0%; background: var(--color-error)"></div>
+                      </div>
+                    </div>
+
+                    <div class="metric-card">
+                      <div class="metric-header">
+                        <span class="metric-label">이상치</span>
+                        <span class="metric-icon">⚠️</span>
+                      </div>
+                      <div class="metric-value" id="outlierCount">0</div>
+                      <div class="metric-subtext" id="outlierPercent">0% of numeric cells</div>
+                      <div class="progress-bar">
+                        <div class="progress-fill" id="outlierProgress"
+                          style="width: 0%; background: var(--color-warning)"></div>
+                      </div>
+                    </div>
+                  </section>
+
+                  <!-- Control Panel -->
+                  <section class="control-panel glass-card">
+                    <h2>🛠️ 데이터 클리닝 옵션</h2>
+                    <div class="controls-grid">
+                      <!-- Missing Values Control -->
+                      <div class="control-group">
+                        <h4>🔴 결측치 처리</h4>
+                        <label for="missingMethod">처리 방법 선택:</label>
+                        <select id="missingMethod">
+                          <option value="">선택하세요</option>
+                          <option value="mean">평균값으로 채우기</option>
+                          <option value="median">중앙값으로 채우기</option>
+                          <option value="mode">최빈값으로 채우기</option>
+                          <option value="delete">행 삭제</option>
+                        </select>
+                        <button class="btn btn-primary" id="applyMissingBtn" disabled>적용</button>
+                      </div>
+
+                      <!-- Outliers Control -->
+                      <div class="control-group">
+                        <h4>🟠 이상치 처리</h4>
+                        <label for="outlierMethod">처리 방법 선택:</label>
+                        <select id="outlierMethod">
+                          <option value="">선택하세요</option>
+                          <option value="cap">경계값으로 제한</option>
+                          <option value="delete">행 삭제</option>
+                        </select>
+                        <button class="btn btn-primary" id="applyOutlierBtn" disabled>적용</button>
+                      </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div style="display: flex; gap: 1rem; margin-top: 1.5rem; flex-wrap: wrap;">
+                      <button class="btn btn-secondary" id="resetBtn">🔄 원본으로 되돌리기</button>
+                      <button class="btn btn-success" id="exportBtn">💾 클리닝된 데이터 다운로드</button>
+                      <button class="btn btn-secondary" id="toggleComparisonBtn">👁️ Before/After 비교</button>
+                    </div>
+                  </section>
+
+                  <!-- Legend -->
+                  <div class="legend">
+                    <div class="legend-item">
+                      <div class="legend-color missing"></div>
+                      <span>결측치</span>
+                    </div>
+                    <div class="legend-item">
+                      <div class="legend-color outlier"></div>
+                      <span>이상치</span>
+                    </div>
+                    <div class="legend-item">
+                      <div class="legend-color changed"></div>
+                      <span>변경된 값</span>
+                    </div>
+                  </div>
+
+                  <!-- Current Data Table -->
+                  <section class="table-section glass-card">
+                    <h3>📈 현재 데이터</h3>
+                    <div class="table-container">
+                      <table class="data-table" id="currentTable">
+                        <thead id="currentTableHead"></thead>
+                        <tbody id="currentTableBody"></tbody>
+                      </table>
+                    </div>
+                  </section>
+
+                  <!-- Comparison Section -->
+                  <section class="comparison-section" id="comparisonSection">
+                    <div class="comparison-grid">
+                      <!-- Before -->
+                      <div class="glass-card comparison-panel">
+                        <h3>📊 Before (원본)</h3>
+                        <div class="table-container">
+                          <table class="data-table" id="beforeTable">
+                            <thead id="beforeTableHead"></thead>
+                            <tbody id="beforeTableBody"></tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      <!-- After -->
+                      <div class="glass-card comparison-panel">
+                        <h3>✨ After (클리닝 후)</h3>
+                        <div class="table-container">
+                          <table class="data-table" id="afterTable">
+                            <thead id="afterTableHead"></thead>
+                            <tbody id="afterTableBody"></tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+              </div>
+
+              <!-- SheetJS Library for XLSX Parsing -->
+              <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+              <!-- Papa Parse Library for CSV Parsing -->
+              <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+              <!-- Main Script -->
+              <script src="script.js"></script>
+            </body>
+
+            </html>
